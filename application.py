@@ -1,6 +1,9 @@
 from flask import Flask, render_template
 from flask_sqlalchemy import SQLAlchemy
-from wtform_fields import *
+#from wtform_fields import *
+from flask_wtf import FlaskForm
+from wtforms import StringField, PasswordField, SubmitField
+from wtforms.validators import InputRequired, Length, EqualTo, ValidationError
 #from models import *
 
 # Configure app
@@ -21,6 +24,26 @@ class User(db.Model):
     username = db.Column(db.String(25), unique=True, nullable=False)
     password = db.Column(db.String(), nullable=False)
 
+# This are the previous wtform_fields.py
+class RegistrationForm(FlaskForm):
+    """ Registration form """
+
+    username = StringField('username_label', 
+        validators=[InputRequired(message="Username required"),
+        Length(min=4, max=25, message="Username must be between 4 and 25 characters")])
+    password = PasswordField('password_label',
+        validators=[InputRequired(message="Password required"),
+        Length(min=4, max=25, message="Password must be between 4 and 25 characters")])
+    confirm_pswd = PasswordField('confirm_pswd_label',
+        validators=[InputRequired(message="Password required"),
+        EqualTo('password', message="Passwords must match")])
+    submit_button = SubmitField('Create')
+    
+    def validate_username(self, username):
+        user_object = User.query.filter_by(username=username.data).first()
+        if user_object:
+            raise ValidationError("Username already exists. Select different username.")
+
 @app.route("/", methods=['GET', 'POST'])
 def index():
 
@@ -30,9 +53,9 @@ def index():
         password = reg_form.password.data
 
         # Check username exists
-        user_object = User.query.filter_by(username=username).first()
-        if user_object:
-            return "Someone else has taken this username!"
+        # user_object = User.query.filter_by(username=username).first()
+        # if user_object:
+        #     return "Someone else has taken this username!"
 
         # Add user to DB
         user = User(username=username, password=password)
