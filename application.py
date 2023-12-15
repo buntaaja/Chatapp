@@ -1,5 +1,6 @@
 from flask import Flask, render_template, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
+from passlib.hash import pbkdf2_sha256 #sha215 also exists
 #from wtform_fields import *
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField
@@ -34,8 +35,9 @@ def invalid_credentials(form, field):
     user_object = User.query.filter_by(username=username_entered).first()
     if user_object is None:
         raise ValidationError("Username or password is incorrect.")
-    elif password_entered != user_object.password:
-        raise ValidationError("Username or password is incorrect.")
+    #elif password_entered != user_object.password:
+    elif not pbkdf2_sha256.verify(password_entered, user_object.password):
+        raise ValidationError("Username or password is incorrect")
 
 class RegistrationForm(FlaskForm):
     """ Registration form """
@@ -82,8 +84,11 @@ def index():
         # if user_object:
         #     return "Someone else has taken this username!"
 
+        # Hash password
+        hashed_pswd = pbkdf2_sha256.hash(password) #29.000 iterations
+
         # Add user to DB
-        user = User(username=username, password=password)
+        user = User(username=username, password=hashed_pswd)
         db.session.add(user)
         db.session.commit()
 
