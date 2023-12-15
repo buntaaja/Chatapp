@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 #from wtform_fields import *
 from flask_wtf import FlaskForm
@@ -25,6 +25,18 @@ class User(db.Model):
     password = db.Column(db.String(), nullable=False)
 
 # This are the previous wtform_fields.py
+def invalid_credentials(form, field):
+    """ Username and password checker """
+    username_entered = form.username.data
+    password_entered = field.data
+
+    # Check credentials are valid
+    user_object = User.query.filter_by(username=username_entered).first()
+    if user_object is None:
+        raise ValidationError("Username or password is incorrect.")
+    elif password_entered != user_object.password:
+        raise ValidationError("Username or password is incorrect.")
+
 class RegistrationForm(FlaskForm):
     """ Registration form """
 
@@ -44,10 +56,23 @@ class RegistrationForm(FlaskForm):
         if user_object:
             raise ValidationError("Username already exists. Select different username.")
 
+class LoginForm(FlaskForm):
+    """ Login form """
+
+    username = StringField('username_label', 
+        validators=[InputRequired(message="Username required")])
+    password = PasswordField('password_label',
+        validators=[InputRequired(message="Password required"),
+        invalid_credentials])
+    submit_button = SubmitField('Login')
+
+
 @app.route("/", methods=['GET', 'POST'])
 def index():
 
     reg_form = RegistrationForm()
+
+    # Update DB is validation was successfull
     if reg_form.validate_on_submit():
         username = reg_form.username.data
         password = reg_form.password.data
@@ -61,10 +86,23 @@ def index():
         user = User(username=username, password=password)
         db.session.add(user)
         db.session.commit()
-        return "Inserted into DB!"
+
+        return redirect(url_for('login'))
 
 
     return render_template("index.html", form=reg_form)
+
+@app.route("/login", methods=['GET', 'POST'])
+def login():
+
+    login_form = LoginForm()
+
+    # Allow login if validation success
+    if login_form.validate_on_submit():
+        return "Logged in, finally"
+
+    return render_template("login.html", form=login_form)
+
 
 if __name__ == "__main__":
     app.run(debug=True)
