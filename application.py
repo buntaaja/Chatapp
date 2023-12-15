@@ -1,5 +1,7 @@
+from time import localtime, strftime
 from flask import Flask, render_template, redirect, url_for, flash
 from flask_login import LoginManager, login_user, current_user, login_required, logout_user
+from flask_socketio import SocketIO, send, emit, join_room, leave_room
 #from models import *
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
@@ -17,6 +19,11 @@ app.secret_key = 'replace later'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://fboecypywtrptr:0748b3a20a2fa3f0ef77dbbcb5c6d0a64022b55af2e6bc3bc52e912f5fa0383c@ec2-34-242-199-141.eu-west-1.compute.amazonaws.com:5432/d9vgh90ob3qi9f'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # Disable Flask-SQLAlchemy event system
 db = SQLAlchemy(app)
+
+# Initialize Flask-SocketIO
+socketio = SocketIO(app)
+# define list of rooms
+ROOMS = ["lounge", "news", "games", "coding"]
 
 # Configure flask login
 login = LoginManager(app)
@@ -133,11 +140,12 @@ def login():
 @app.route("/chat", methods=['GET', 'POST'])
 #@login_required
 def chat():
-    if not current_user.is_authenticated:
-        flash('Please login.', 'danger') # name dange matches the bootstrap class
-        return redirect(url_for('login'))
+    # if not current_user.is_authenticated:
+    #     flash('Please login.', 'danger') # name dange matches the bootstrap class
+    #     return redirect(url_for('login'))
 
-    return "Chat with me"
+    return render_template('chat.html', username=current_user.username,
+        rooms=ROOMS)
 
 @app.route("/logout", methods=['GET'])
 def logout():
@@ -145,5 +153,37 @@ def logout():
     flash('You have logged out successfully', 'success')
     return redirect(url_for('login'))
 
+
+# Add event buckets for SocketIO
+@socketio.on('message')
+def message(data):
+
+    print(f"\n\n{data}\n\n")
+    # send(data) # By default it sends the data to event bucket called message
+    # emit('some-event', 'this is a custom event message') # sends to the client event bucket called some-event
+    # This is the username: current_user.username
+    # pass out the username with template
+    
+    send({'msg': data['msg'], 'username': data['username'], 
+        'time_stamp': strftime('%b-%d %I:%M%p', localtime())}, 
+        room=data['room'])
+
+@socketio.on('join')
+def join(data):
+
+    join_room(data['room'])
+    send({'msg': data['username'] + " has joined the " + data['room'] + "room."}, 
+        room=data['room'])
+
+@socketio.on('leave')
+def leave(data):
+
+    leave_room(data['room'])
+    send({'msg': data['username'] + " has left the " + data['room'] + "room."}, 
+        room=data['room'])
+
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    #app.run(debug=True)
+    # flask socketio has its own
+    socketio.run(app, debug=True)
