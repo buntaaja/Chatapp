@@ -1,11 +1,13 @@
 from flask import Flask, render_template, redirect, url_for
+from flask_login import LoginManager, login_user, current_user, login_required, logout_user
+#from models import *
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import UserMixin
 from passlib.hash import pbkdf2_sha256 #sha215 also exists
 #from wtform_fields import *
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField
 from wtforms.validators import InputRequired, Length, EqualTo, ValidationError
-#from models import *
 
 # Configure app
 app = Flask(__name__)
@@ -16,8 +18,12 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://fboecypywtrptr:0748b3a20a2
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # Disable Flask-SQLAlchemy event system
 db = SQLAlchemy(app)
 
+# Configure flask login
+login = LoginManager(app)
+login.init_app(app)
+
 # This are the previous models.py
-class User(db.Model):
+class User(UserMixin, db.Model): # Usermixin tells about user (it automatically adds a lot of methods to the class)
     """ User model """
 
     __tablename__="users"
@@ -69,6 +75,12 @@ class LoginForm(FlaskForm):
     submit_button = SubmitField('Login')
 
 
+@login.user_loader
+def load_user(id):
+
+    # User.query.filter_by(id=id).first()
+    return User.query.get(int(id))
+
 @app.route("/", methods=['GET', 'POST'])
 def index():
 
@@ -104,10 +116,29 @@ def login():
 
     # Allow login if validation success
     if login_form.validate_on_submit():
-        return "Logged in, finally"
+        user_object = User.query.filter_by(username=login_form.username.data).first()
+        login_user(user_object)
+        # current_user.username gives us the username of current user
+        # Let's check if current user is logged in with mixin
+        # if current_user.is_authenticated:
+            # return "Logged in with flask-login!"
+        return redirect(url_for('chat'))
+        
+        #return "Not logged in :()"
 
     return render_template("login.html", form=login_form)
 
+@app.route("/chat", methods=['GET', 'POST'])
+#@login_required
+def chat():
+    if not current_user.is_authenticated:
+        return "Please login before accessing chat"
+    return "Chat with me"
+
+@app.route("/logout", methods=['GET'])
+def logout():
+    logout_user()
+    return "Logged out using flask-login"
 
 if __name__ == "__main__":
     app.run(debug=True)
